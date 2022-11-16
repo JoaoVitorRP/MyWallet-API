@@ -37,10 +37,9 @@ app.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
   const hashPassword = bcrypt.hashSync(password, 15);
 
-  const { error } = registerSchema.validate(req.body, { abortEarly: false });
+  const { error } = registerSchema.validate(req.body);
   if (error) {
-    const errors = error.details.map((detail) => detail.message);
-    res.status(422).send(errors);
+    res.status(422).send(error.details[0].message);
     return;
   }
 
@@ -66,14 +65,13 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  const { error } = loginSchema.validate(req.body, { abortEarly: false });
+  const { error } = loginSchema.validate(req.body);
   if (error) {
-    const errors = error.details.map((detail) => detail.message);
-    res.status(422).send(errors);
+    res.status(422).send(error.details[0].message);
     return;
   }
 
-  const user = db.collection("accounts").findOne({ email });
+  const user = await db.collection("accounts").findOne({ email });
   if (!user) {
     res.status(404).send("Email invalido!");
     return;
@@ -93,7 +91,7 @@ app.post("/login", async (req, res) => {
       res.status(500).send(err);
     }
   } else {
-    res.status(409).send("Senha incorreta!");
+    res.status(401).send("Senha incorreta!");
   }
 });
 
