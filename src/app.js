@@ -7,7 +7,7 @@ import bcrypt from "bcrypt";
 import { v4 as uuid } from "uuid";
 
 const registerSchema = joi.object({
-  name: joi.string().min(3).required(),
+  name: joi.string().min(3).max(30).required(),
   email: joi.string().email().required(),
   password: joi.string().min(6).required(),
 });
@@ -24,10 +24,11 @@ app.use(cors());
 app.use(express.json());
 
 const mongoClient = new MongoClient(process.env.MONGO_URI);
+let db;
 
 try {
   await mongoClient.connect();
-  const db = mongoClient.db("MyWallet_API");
+  db = mongoClient.db("MyWallet_API");
 } catch (err) {
   console.log(err);
 }
