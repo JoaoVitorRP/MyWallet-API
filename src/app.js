@@ -74,6 +74,11 @@ app.post("/login", async (req, res) => {
   const user = await db.collection("accounts").findOne({ email });
   if (!user) return res.status(404).send("Email invalido!");
 
+  const alreadyHasAToken = await db.collection("sessions").findOne({ userId: user._id });
+  if (alreadyHasAToken) {
+    db.collection("sessions").deleteOne({ userId: user._id });
+  }
+
   if (bcrypt.compareSync(password, user.password)) {
     try {
       const token = uuid();
@@ -104,7 +109,7 @@ app.get("/history", async (req, res) => {
   if (!user) return res.status(404).send("Could not find the user");
 
   try {
-    const history = await db.collection("history").find({ from: user.email }).toArray();
+    const history = await db.collection("history").find({ from: user.email }).sort({ time: -1 }).toArray();
     res.send(history);
   } catch (err) {
     res.status(500).send(err);
@@ -134,6 +139,7 @@ app.post("/history", async (req, res) => {
       value,
       description,
       type,
+      time: Date.now(),
     });
     res.sendStatus(201);
   } catch (err) {
