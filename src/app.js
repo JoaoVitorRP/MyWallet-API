@@ -5,6 +5,7 @@ import { MongoClient } from "mongodb";
 import joi from "joi";
 import bcrypt from "bcrypt";
 import { v4 as uuid } from "uuid";
+import dayjs from "dayjs";
 
 const registerSchema = joi.object({
   name: joi.string().min(3).max(30).required(),
@@ -15,6 +16,12 @@ const registerSchema = joi.object({
 const loginSchema = joi.object({
   email: joi.string().required(),
   password: joi.string().required(),
+});
+
+const historySchema = joi.object({
+  value: joi.number().positive().required(),
+  description: joi.string().min(3).max(25).required(),
+  type: joi.string().required(),
 });
 
 dotenv.config();
@@ -38,16 +45,12 @@ app.post("/register", async (req, res) => {
   const hashPassword = bcrypt.hashSync(password, 15);
 
   const { error } = registerSchema.validate(req.body);
-  if (error) {
-    res.status(422).send(error.details[0].message);
-    return;
-  }
+  if (error) return res.status(422).send(error.details[0].message);
 
   try {
     const emailAlreadyExists = await db.collection("accounts").findOne({ email });
     if (emailAlreadyExists) {
-      res.status(409).send("Este email já se encontra cadastrado!");
-      return;
+      return res.status(409).send("Este email já se encontra cadastrado!");
     }
 
     await db.collection("accounts").insertOne({
@@ -66,16 +69,10 @@ app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   const { error } = loginSchema.validate(req.body);
-  if (error) {
-    res.status(422).send(error.details[0].message);
-    return;
-  }
+  if (error) return res.status(422).send(error.details[0].message);
 
   const user = await db.collection("accounts").findOne({ email });
-  if (!user) {
-    res.status(404).send("Email invalido!");
-    return;
-  }
+  if (!user) return res.status(404).send("Email invalido!");
 
   if (bcrypt.compareSync(password, user.password)) {
     try {
@@ -103,13 +100,43 @@ app.get("/history", async (req, res) => {
   const session = await db.collection("sessions").findOne({ token });
   if (!session) return res.status(404).send("Could not find a session with this token");
 
-  const user = await db.collection("accounts").findOne({ _id: session.userId});
+  const user = await db.collection("accounts").findOne({ _id: session.userId });
   if (!user) return res.status(404).send("Could not find the user");
 
   try {
-    const history = await db.collection("history").find({from: user.email}).toArray();
+    const history = await db.collection("history").find({ from: user.email }).toArray();
     res.send(history);
-  } catch(err) {
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
+app.post("/history", async (req, res) => {
+  const { authorization } = req.headers;
+  const { value, description, type } = req.body;
+
+  const token = authorization?.replace("Bearer ", "");
+  if (!token) return res.status(400).send("Missing bearer token");
+
+  const session = await db.collection("sessions").findOne({ token });
+  if (!session) return res.status(404).send("Could not find a session with this token");
+
+  const user = await db.collection("accounts").findOne({ _id: session.userId });
+  if (!user) return res.status(404).send("Could not find the user");
+
+  const { error } = historySchema.validate(req.body);
+  if (error) return res.status(422).send(error.details[0].message);
+
+  try {
+    await db.collection("history").insertOne({
+      from: user.email,
+      date: dayjs().format("DD/MM"),
+      value,
+      description,
+      type,
+    });
+    res.sendStatus(201);
+  } catch (err) {
     res.status(500).send(err);
   }
 });
