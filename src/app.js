@@ -85,13 +85,32 @@ app.post("/login", async (req, res) => {
         userId: user._id,
         token,
       });
-      
-      res.send(token);
+
+      res.send({ name: user.name, token });
     } catch (err) {
       res.status(500).send(err);
     }
   } else {
     res.status(401).send("Senha incorreta!");
+  }
+});
+
+app.get("/history", async (req, res) => {
+  const { authorization } = req.headers;
+  const token = authorization?.replace("Bearer ", "");
+  if (!token) return res.status(400).send("Missing bearer token");
+
+  const session = await db.collection("sessions").findOne({ token });
+  if (!session) return res.status(404).send("Could not find a session with this token");
+
+  const user = await db.collection("accounts").findOne({ _id: session.userId});
+  if (!user) return res.status(404).send("Could not find the user");
+
+  try {
+    const history = await db.collection("history").find({from: user.email}).toArray();
+    res.send(history);
+  } catch(err) {
+    res.status(500).send(err);
   }
 });
 
