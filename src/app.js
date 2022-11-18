@@ -19,7 +19,7 @@ const loginSchema = joi.object({
 });
 
 const historySchema = joi.object({
-  value: joi.number().positive().required(),
+  value: joi.number().precision(2).positive().max(99999999).required(),
   description: joi.string().min(3).max(25).required(),
   type: joi.string().required(),
 });
@@ -110,6 +110,11 @@ app.get("/history", async (req, res) => {
 
   try {
     const history = await db.collection("history").find({ from: user.email }).sort({ time: -1 }).toArray();
+    history?.forEach((h) => {
+      delete h.from;
+      delete h.time;
+      delete h._id;
+    });
     res.send(history);
   } catch (err) {
     res.status(500).send(err);
@@ -129,7 +134,7 @@ app.post("/history", async (req, res) => {
   const user = await db.collection("accounts").findOne({ _id: session.userId });
   if (!user) return res.status(404).send("Could not find the user");
 
-  const { error } = historySchema.validate(req.body);
+  const { error } = historySchema.validate(req.body, { convert: false });
   if (error) return res.status(422).send(error.details[0].message);
 
   try {
@@ -143,6 +148,22 @@ app.post("/history", async (req, res) => {
     });
     res.sendStatus(201);
   } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
+app.delete("/sessions", async (req, res) => {
+  const { authorization } = req.headers;
+  const token = authorization?.replace("Bearer ", "");
+  if (!token) return res.status(400).send("Missing bearer token");
+
+  const session = await db.collection("sessions").findOne({ token });
+  if (!session) return res.status(404).send("Could not find a sessions with this token");
+
+  try {
+    await db.collection("sessions").deleteOne({token});
+    res.sendStatus(201);
+  } catch(err){
     res.status(500).send(err);
   }
 });
