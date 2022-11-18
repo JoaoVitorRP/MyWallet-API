@@ -3,22 +3,22 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { MongoClient } from "mongodb";
 import joi from "joi";
-import bcrypt from "bcrypt";
-import { v4 as uuid } from "uuid";
-import dayjs from "dayjs";
+import { postAccount } from "./controllers/accountsController.js";
+import { deleteSession, postSession } from "./controllers/sessionsController.js";
+import { getHistory, postHistory } from "./controllers/historyController.js";
 
-const registerSchema = joi.object({
+export const accountSchema = joi.object({
   name: joi.string().min(3).max(30).required(),
   email: joi.string().email().required(),
   password: joi.string().min(6).required(),
 });
 
-const loginSchema = joi.object({
+export const loginSchema = joi.object({
   email: joi.string().required(),
   password: joi.string().required(),
 });
 
-const historySchema = joi.object({
+export const historySchema = joi.object({
   value: joi.number().precision(2).positive().max(99999999).required(),
   description: joi.string().min(3).max(25).required(),
   type: joi.string().required(),
@@ -40,132 +40,18 @@ try {
   console.log(err);
 }
 
-app.post("/register", async (req, res) => {
-  const { name, email, password } = req.body;
-  const hashPassword = bcrypt.hashSync(password, 15);
+export const accountsCollection = db.collection("accounts");
+export const sessionsCollection = db.collection("sessions");
+export const historyCollection = db.collection("history");
 
-  const { error } = registerSchema.validate(req.body);
-  if (error) return res.status(422).send(error.details[0].message);
+app.post("/accounts", postAccount);
 
-  try {
-    const emailAlreadyExists = await db.collection("accounts").findOne({ email });
-    if (emailAlreadyExists) {
-      return res.status(409).send("Este email já se encontra cadastrado!");
-    }
+app.post("/sessions", postSession);
 
-    await db.collection("accounts").insertOne({
-      name,
-      email,
-      password: hashPassword,
-    });
+app.get("/history", getHistory);
 
-    res.sendStatus(201);
-  } catch (err) {
-    res.status(500).send(err);
-  }
-});
+app.post("/history", postHistory);
 
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  const { error } = loginSchema.validate(req.body);
-  if (error) return res.status(422).send(error.details[0].message);
-
-  const user = await db.collection("accounts").findOne({ email });
-  if (!user) return res.status(404).send("Email invalido!");
-
-  const alreadyHasAToken = await db.collection("sessions").findOne({ userId: user._id });
-  if (alreadyHasAToken) {
-    db.collection("sessions").deleteOne({ userId: user._id });
-  }
-
-  if (bcrypt.compareSync(password, user.password)) {
-    try {
-      const token = uuid();
-
-      await db.collection("sessions").insertOne({
-        userId: user._id,
-        token,
-      });
-
-      res.send({ name: user.name, token });
-    } catch (err) {
-      res.status(500).send(err);
-    }
-  } else {
-    res.status(401).send("Senha incorreta!");
-  }
-});
-
-app.get("/history", async (req, res) => {
-  const { authorization } = req.headers;
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) return res.status(400).send("Missing bearer token");
-
-  const session = await db.collection("sessions").findOne({ token });
-  if (!session) return res.status(404).send("Could not find a session with this token");
-
-  const user = await db.collection("accounts").findOne({ _id: session.userId });
-  if (!user) return res.status(404).send("Could not find the user");
-
-  try {
-    const history = await db.collection("history").find({ from: user.email }).sort({ time: -1 }).toArray();
-    history?.forEach((h) => {
-      delete h.from;
-      delete h.time;
-      delete h._id;
-    });
-    res.send(history);
-  } catch (err) {
-    res.status(500).send(err);
-  }
-});
-
-app.post("/history", async (req, res) => {
-  const { authorization } = req.headers;
-  const { value, description, type } = req.body;
-
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) return res.status(400).send("Missing bearer token");
-
-  const session = await db.collection("sessions").findOne({ token });
-  if (!session) return res.status(404).send("Could not find a session with this token");
-
-  const user = await db.collection("accounts").findOne({ _id: session.userId });
-  if (!user) return res.status(404).send("Could not find the user");
-
-  const { error } = historySchema.validate(req.body, { convert: false });
-  if (error) return res.status(422).send(error.details[0].message);
-
-  try {
-    await db.collection("history").insertOne({
-      from: user.email,
-      date: dayjs().format("DD/MM"),
-      value,
-      description,
-      type,
-      time: Date.now(),
-    });
-    res.sendStatus(201);
-  } catch (err) {
-    res.status(500).send(err);
-  }
-});
-
-app.delete("/sessions", async (req, res) => {
-  const { authorization } = req.headers;
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) return res.status(400).send("Missing bearer token");
-
-  const session = await db.collection("sessions").findOne({ token });
-  if (!session) return res.status(404).send("Could not find a sessions with this token");
-
-  try {
-    await db.collection("sessions").deleteOne({token});
-    res.sendStatus(201);
-  } catch(err){
-    res.status(500).send(err);
-  }
-});
+app.delete("/sessions", deleteSession);
 
 app.listen(5000, () => console.log("Server running in port: 5000"));
