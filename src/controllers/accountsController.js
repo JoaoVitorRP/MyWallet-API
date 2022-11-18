@@ -1,10 +1,9 @@
-import { accountSchema } from "../app.js";
+import { accountSchema } from "../schemas/accountSchema.js";
 import bcrypt from "bcrypt";
 import { accountsCollection } from "../database/db.js";
 
 export async function postAccount(req, res) {
   const { name, email, password } = req.body;
-  const hashPassword = bcrypt.hashSync(password, 15);
 
   const { error } = accountSchema.validate(req.body);
   if (error) return res.status(422).send(error.details[0].message);
@@ -14,6 +13,8 @@ export async function postAccount(req, res) {
     if (emailAlreadyExists) {
       return res.status(409).send("Este email já se encontra cadastrado!");
     }
+
+    const hashPassword = bcrypt.hashSync(password, 15);
 
     await accountsCollection.insertOne({
       name,

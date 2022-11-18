@@ -1,17 +1,9 @@
-import { historySchema } from "../app.js";
+import { historySchema } from "../schemas/historySchema.js";
 import dayjs from "dayjs";
-import { accountsCollection, historyCollection, sessionsCollection } from "../database/db.js";
+import { historyCollection } from "../database/db.js";
 
 export async function getHistory(req, res) {
-  const { authorization } = req.headers;
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) return res.status(400).send("Missing bearer token");
-
-  const session = await sessionsCollection.findOne({ token });
-  if (!session) return res.status(404).send("Could not find a session with this token");
-
-  const user = await accountsCollection.findOne({ _id: session.userId });
-  if (!user) return res.status(404).send("Could not find the user");
+  const user = req.user;
 
   try {
     const history = await historyCollection.find({ from: user.email }).sort({ time: -1 }).toArray();
@@ -27,17 +19,9 @@ export async function getHistory(req, res) {
 }
 
 export async function postHistory(req, res) {
-  const { authorization } = req.headers;
   const { value, description, type } = req.body;
 
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) return res.status(400).send("Missing bearer token");
-
-  const session = await sessionsCollection.findOne({ token });
-  if (!session) return res.status(404).send("Could not find a session with this token");
-
-  const user = await accountsCollection.findOne({ _id: session.userId });
-  if (!user) return res.status(404).send("Could not find the user");
+  const user = req.user;
 
   const { error } = historySchema.validate(req.body, { convert: false });
   if (error) return res.status(422).send(error.details[0].message);

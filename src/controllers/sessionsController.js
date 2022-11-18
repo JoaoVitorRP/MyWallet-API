@@ -1,4 +1,4 @@
-import { loginSchema } from "../app.js";
+import { loginSchema } from "../schemas/loginSchema.js";
 import bcrypt from "bcrypt";
 import { v4 as uuid } from "uuid";
 import { accountsCollection, sessionsCollection } from "../database/db.js";
@@ -36,12 +36,7 @@ export async function postSession(req, res) {
 }
 
 export async function deleteSession(req, res) {
-  const { authorization } = req.headers;
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) return res.status(400).send("Missing bearer token");
-
-  const session = await sessionsCollection.findOne({ token });
-  if (!session) return res.status(404).send("Could not find a sessions with this token");
+  const token = req.token;
 
   try {
     await sessionsCollection.deleteOne({ token });
