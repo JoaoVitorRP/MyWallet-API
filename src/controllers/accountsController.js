@@ -1,5 +1,6 @@
-import { accountsCollection, accountSchema } from "../app.js";
+import { accountSchema } from "../app.js";
 import bcrypt from "bcrypt";
+import { accountsCollection } from "../database/db.js";
 
 export async function postAccount(req, res) {
   const { name, email, password } = req.body;

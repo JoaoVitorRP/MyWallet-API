@@ -1,5 +1,6 @@
-import { accountsCollection, historyCollection, historySchema, sessionsCollection } from "../app.js";
+import { historySchema } from "../app.js";
 import dayjs from "dayjs";
+import { accountsCollection, historyCollection, sessionsCollection } from "../database/db.js";
 
 export async function getHistory(req, res) {
   const { authorization } = req.headers;

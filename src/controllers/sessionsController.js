@@ -1,6 +1,7 @@
-import { accountsCollection, loginSchema, sessionsCollection } from "../app.js";
+import { loginSchema } from "../app.js";
 import bcrypt from "bcrypt";
 import { v4 as uuid } from "uuid";
+import { accountsCollection, sessionsCollection } from "../database/db.js";
 
 export async function postSession(req, res) {
   const { email, password } = req.body;
