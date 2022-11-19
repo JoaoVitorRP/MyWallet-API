@@ -9,6 +9,7 @@ let db;
 try {
   await mongoClient.connect();
   db = mongoClient.db("MyWallet_API");
+  console.log("Connected to MongoDB");
 } catch (err) {
   console.log(err);
 }
